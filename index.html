@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pomodoro</title>
+<style>
+body{margin:0;min-height:100svh;display:grid;place-items:center;background:#fafaf7;color:#111;font:15px system-ui,sans-serif}
+main{width:min(390px,calc(100vw - 28px));text-align:center}
+time{display:block;margin:10px 0 14px;font:750 clamp(58px,20vw,96px)/1 ui-monospace,SFMono-Regular,Menlo,monospace}
+nav,p,.row{display:grid;gap:8px}
+nav{grid-template-columns:repeat(3,1fr)}
+p{grid-template-columns:repeat(4,1fr);margin:14px 0}
+.row{grid-template-columns:1fr auto;margin:12px 0}
+button,input{height:39px;border:1px solid #ccc;border-radius:6px;background:#fff;color:inherit;font:inherit}
+button{cursor:pointer;font-weight:650;padding:0 10px}
+button[aria-pressed=true],#go{background:#0f766e;border-color:#0f766e;color:#fff}
+input{min-width:0;padding:0 9px}
+label{display:flex;align-items:center;gap:8px;color:#666}
+section{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;border-top:1px solid #ddd;margin-top:14px;padding-top:14px}
+b{display:block;font-size:21px;font-variant-numeric:tabular-nums}
+small,#phase,summary{color:#666}
+details{border-top:1px solid #ddd;margin-top:14px;padding-top:12px;text-align:left}
+summary{cursor:pointer;text-align:center}
+.settings{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.settings label{display:grid;gap:4px;font-size:12px}
+.settings input{width:100%}
+@media (prefers-color-scheme:dark){body{background:#11130f;color:#f5f5ef}button,input{background:#171a15;border-color:#333830}label,small,#phase,summary{color:#a2a79b}section,details{border-color:#333830}button[aria-pressed=true],#go{background:#2dd4bf;border-color:#2dd4bf;color:#07110f}}
+</style>
+<main aria-label="Pomodoro timer">
+  <nav aria-label="Timer mode">
+    <button id="w">focus</button><button id="s">short</button><button id="l">long</button>
+  </nav>
+  <time id="t">25:00</time>
+  <div id="phase">focus 1/4</div>
+  <p><button id="go">start</button><button id="re">reset</button><button id="sk">skip</button><button id="dn">done</button></p>
+  <div class="row"><input id="task" maxlength="80" placeholder="task memory"><button id="clr">clear</button></div>
+  <section aria-label="Stats">
+    <div><b id="td">0</b><small>today</small></div>
+    <div><b id="wk">0%</b><small>7-day</small></div>
+    <div><b id="st">0</b><small>streak</small></div>
+    <div><b id="bs">0</b><small>best</small></div>
+  </section>
+  <details>
+    <summary>settings</summary>
+    <div class="settings">
+      <label>focus<input id="cf" type="number" min="1" max="120" value="25"></label>
+      <label>short<input id="cs" type="number" min="1" max="60" value="5"></label>
+      <label>long<input id="cl" type="number" min="1" max="120" value="15"></label>
+      <label>rounds<input id="cr" type="number" min="1" max="12" value="4"></label>
+    </div>
+    <label><input id="auto" type="checkbox"> auto-next</label>
+  </details>
+</main>
+<script>
+(()=>{const K="p2",OLD="p",MS=864e5,N=["focus","short","long"],ID=x=>document.getElementById(x),E=["w","s","l","t","phase","go","re","sk","dn","task","clr","td","wk","st","bs","cf","cs","cl","cr","auto"].reduce((o,k)=>(o[k]=ID(k),o),{});let M=load(),cfg=M.cfg,days=M.days,best=M.best,task=M.task,mode=M.mode,round=M.round,left=M.left,end=M.end,on=0,to=0;
+function num(v,min,max,fb){v=Number(v);return Number.isFinite(v)?Math.min(max,Math.max(min,Math.trunc(v))):fb}
+function key(n=0){let d=new Date(Date.now()-n*MS);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function keep(x){let o={};if(!x||typeof x!="object")return o;for(let i=0;i<7;i++){let k=key(i),v=x[k];if(Number.isInteger(v)&&v>0)o[k]=Math.min(v,99)}return o}
+function old(){try{return keep(JSON.parse(localStorage.getItem(OLD)||"{}"))}catch{return {}}}
+function load(){try{let x=JSON.parse(localStorage.getItem(K)||"{}");if(!x||typeof x!="object"||Array.isArray(x))x={};let c=x.cfg||{};return{cfg:{f:num(c.f,1,120,25),s:num(c.s,1,60,5),l:num(c.l,1,120,15),r:num(c.r,1,12,4),a:!!c.a},days:keep(x.days||old()),best:num(x.best,0,999,0),task:String(x.task||"").slice(0,80),mode:num(x.mode,0,2,0),round:num(x.round,0,11,0),left:num(x.left,0,7200,0),end:num(x.end,0,Date.now()+7200e3,0)}}catch{return{cfg:{f:25,s:5,l:15,r:4,a:0},days:old(),best:0,task:"",mode:0,round:0,left:0,end:0}}}
+function dur(m=mode){return [cfg.f,cfg.s,cfg.l][m]*60}
+function save(){let run=0;days=keep(days);while(run<7&&days[key(run)]>0)run++;best=Math.max(best,run);localStorage.setItem(K,JSON.stringify({cfg,days,best,task,mode,round,left,end:on?end:0}))}
+function fmt(x){x=Math.max(0,x);return Math.floor(x/60)+":"+String(x%60).padStart(2,"0")}
+function stats(){let hit=0,run=0;for(let i=0;i<7;i++)if(days[key(i)]>0)hit++;while(run<7&&days[key(run)]>0)run++;best=Math.max(best,run);E.td.textContent=days[key()]||0;E.wk.textContent=Math.round(hit/7*100)+"%";E.st.textContent=run;E.bs.textContent=best}
+function paint(){E.t.textContent=fmt(left||dur());E.phase.textContent=N[mode]+" "+(round+1)+"/"+cfg.r;E.go.textContent=on?"pause":"start";[E.w,E.s,E.l].forEach((b,i)=>b.setAttribute("aria-pressed",i==mode));E.task.value=task;E.cf.value=cfg.f;E.cs.value=cfg.s;E.cl.value=cfg.l;E.cr.value=cfg.r;E.auto.checked=cfg.a;stats()}
+function stop(){on=0;clearTimeout(to);save();paint()}
+function set(m){stop();mode=m;left=dur();save();paint()}
+function next(count){if(mode==0){if(count){let k=key();days[k]=Math.min((days[k]||0)+1,99);round=(round+1)%cfg.r;mode=round?1:2}else mode=1}else mode=0;left=dur();save();paint();if(cfg.a)start()}
+function start(){on=1;if(!left)left=dur();end=Date.now()+left*1000;save();tick()}
+function tick(){left=Math.max(0,Math.ceil((end-Date.now())/1000));paint();if(left)to=setTimeout(tick,1000);else{on=0;next(1)}}
+function applyCfg(){cfg={f:num(E.cf.value,1,120,25),s:num(E.cs.value,1,60,5),l:num(E.cl.value,1,120,15),r:num(E.cr.value,1,12,4),a:E.auto.checked};round=Math.min(round,cfg.r-1);if(!on)left=dur();save();paint()}
+E.go.onclick=()=>on?stop():start();E.re.onclick=()=>{stop();left=dur();save();paint()};E.sk.onclick=()=>{stop();next(0)};E.dn.onclick=()=>{stop();next(1)};E.clr.onclick=()=>{task="";save();paint()};E.task.oninput=()=>{task=E.task.value.slice(0,80);save()};[E.w,E.s,E.l].forEach((b,i)=>b.onclick=()=>set(i));[E.cf,E.cs,E.cl,E.cr,E.auto].forEach(x=>x.oninput=applyCfg);
+if(end>Date.now()){on=1;left=Math.ceil((end-Date.now())/1000);tick()}else if(!left)left=dur();paint()})();
+</script>
+</html>
